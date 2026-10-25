@@ -1,0 +1,10 @@
+{
+  "name": "fdcore",
+  "version": "1.0.0",
+  "description": "Portable vibration fault-diagnosis core (features, real FFT, RF, softmax, on-device fine-tuning)",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "flags": ["-O2"]
+  }
+}

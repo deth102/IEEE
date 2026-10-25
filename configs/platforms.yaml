@@ -1,0 +1,73 @@
+# Edge platforms for the resource analysis.
+#
+# cycles.* are EFFECTIVE cycles per operation class for plain C code compiled
+# with -O2 (including the load/store overhead that is not modelled separately).
+# They are ESTIMATES derived from core documentation and must be treated as
+# model parameters: run the bench firmware (03_code/firmware/bench_mcu) on a board
+# and fit them with `python -m tools.calibrate_platform <log>` (least squares).
+# Rows marked calibrated: false are un-calibrated literature/assumption values.
+#
+# Operation classes
+#   flop   single-precision add / sub / mul / compare
+#   div    single-precision division
+#   sqrt   single-precision square root
+#   trans  libm transcendental (log2f / expf / cosf)
+#   mem    load or store not hidden by the arithmetic pipeline
+#   int    integer / branch / index arithmetic
+#
+# power_w: typical active power of the MCU at f_clk with radios off
+# (datasheet typical current x 3.3 V). Used for energy = power x time.
+
+platforms:
+  esp32:
+    label: "ESP32 (Xtensa LX6, 240 MHz)"
+    f_mhz: 240
+    sram_kb: 320          # usable DRAM (of 520 KB total SRAM)
+    flash_kb: 4096
+    fpu: single
+    power_w: 0.165        # ~50 mA @ 3.3 V, dual-core 240 MHz, radio off
+    # fitted (NNLS) on 10 stage measurements of a NodeMCU-32S, tables in DRAM, 2026-09-29:
+    # stage-time MAPE 8.3 %. Individual coefficients are not uniquely identifiable; use for prediction only.
+    cycles: {flop: 4.15, div: 23.81, sqrt: 77.90, trans: 251.33, mem: 0.0, int: 0.95}
+    calibrated: true
+    note: "calibrated on hardware (results/hw/bench_esp32_esp32dev_ramtables.log)"
+  esp32s3:
+    label: "ESP32-S3 (Xtensa LX7, 240 MHz)"
+    f_mhz: 240
+    sram_kb: 512
+    flash_kb: 8192
+    fpu: single
+    power_w: 0.13
+    cycles: {flop: 1.8, div: 16.0, sqrt: 20.0, trans: 130.0, mem: 1.3, int: 1.1}
+    calibrated: false
+    note: "LX7 FPU; PIE SIMD not used by the plain-C pipeline"
+  stm32f446:
+    label: "STM32F446 (Cortex-M4F, 180 MHz)"
+    f_mhz: 180
+    sram_kb: 128
+    flash_kb: 512
+    fpu: single
+    power_w: 0.13
+    cycles: {flop: 1.6, div: 14.0, sqrt: 14.0, trans: 90.0, mem: 1.8, int: 1.2}
+    calibrated: false
+    note: "VDIV/VSQRT 14 cycles (ARM TRM); flash wait states partly hidden by ART"
+  stm32h743:
+    label: "STM32H743 (Cortex-M7, 480 MHz)"
+    f_mhz: 480
+    sram_kb: 1024
+    flash_kb: 2048
+    fpu: double
+    power_w: 0.35
+    cycles: {flop: 0.9, div: 14.0, sqrt: 14.0, trans: 60.0, mem: 1.1, int: 0.7}
+    calibrated: false
+    note: "dual-issue M7, data in DTCM"
+  rp2040:
+    label: "RP2040 (Cortex-M0+, 133 MHz, no FPU)"
+    f_mhz: 133
+    sram_kb: 264
+    flash_kb: 2048
+    fpu: none
+    power_w: 0.08
+    cycles: {flop: 60.0, div: 80.0, sqrt: 90.0, trans: 600.0, mem: 2.0, int: 1.3}
+    calibrated: false
+    note: "soft-float via optimised boot-ROM routines"

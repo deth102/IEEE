@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "author": "demo",
+  "editor": "wokwi",
+
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 220,
+      "left": 20,
+      "attrs": { "psramSize": "4" }
+    },
+    {
+      "type": "wokwi-breadboard",
+      "id": "bb",
+      "top": 160,
+      "left": 200,
+      "attrs": { "rows": "30" }
+    },
+    {
+      "type": "wokwi-lcd2004",
+      "id": "lcd",
+      "top": 20,
+      "left": 520,
+      "attrs": {
+        "pins": "i2c",
+        "address": "0x27"
+      }
+    },
+    {
+      "type": "wokwi-microsd-card",
+      "id": "sd",
+      "top": 20,
+      "left": 120
+    }
+  ],
+
+  "connections": [
+    ["esp:TX0", "$serialMonitor:RX", "", []],
+    ["esp:RX0", "$serialMonitor:TX", "", []],
+
+
+    ["esp:3V3", "bb:1t.a", "red", []],
+    ["esp:GND", "bb:1b.j", "black", []],
+
+
+    ["bb:5t.a", "lcd:VCC", "red", []],
+    ["bb:5b.j", "lcd:GND", "black", []],
+
+    ["esp:D21", "bb:10t.c", "green", []],
+    ["esp:D22", "bb:11t.c", "green", []],
+    ["bb:10t.c", "lcd:SDA", "green", []],
+    ["bb:11t.c", "lcd:SCL", "green", []],
+
+
+    ["bb:5t.e", "sd:VCC", "red", []],
+    ["bb:5b.i", "sd:GND", "black", []],
+
+    ["esp:D5",  "bb:15t.a", "blue", []],
+    ["esp:D18", "bb:16t.a", "blue", []],
+    ["esp:D23", "bb:17t.a", "blue", []],
+    ["esp:D19", "bb:18t.a", "blue", []],
+
+    ["bb:15t.a", "sd:CS",  "blue", []],
+    ["bb:16t.a", "sd:SCK", "blue", []],
+    ["bb:17t.a", "sd:DI",  "blue", []],
+    ["bb:18t.a", "sd:DO",  "blue", []]
+  ]
+}

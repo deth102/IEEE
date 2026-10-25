@@ -1,0 +1,41 @@
+{
+  "n": 8192,
+  "fs": 25600.0,
+  "band_bins": [
+    9,
+    22
+  ],
+  "classes": [
+    "Normal",
+    "BPFI",
+    "BPFO",
+    "Misalign",
+    "Unbalance"
+  ],
+  "rf_trees": 10,
+  "rf_nodes": 408,
+  "softmax_features": [
+    "mean_t",
+    "rms_t",
+    "max_t",
+    "min_t",
+    "ptp_t",
+    "crest_t",
+    "mean_f",
+    "rmsf_f",
+    "var_f",
+    "skew_f",
+    "kurt_f",
+    "fc_f",
+    "fstd_f",
+    "sc_f",
+    "ss_f",
+    "ent_f",
+    "a1x_o",
+    "a2x_o",
+    "a1xr_o"
+  ],
+  "scale": 0.00257887808110282,
+  "trained_on": "blocked fold 0 train, all loads",
+  "test_vectors": 12
+}

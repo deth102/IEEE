@@ -1,0 +1,9 @@
+# KESTREL on bearing-only data: shaft orders + bearing orders (squared envelope).
+# Usage: python -m experiments.<eXX> --dataset cwru --config configs/cwru_env.yaml
+extends: default.yaml
+use_envelope: true
+features: F22
+tag_suffix: env           # result files e.g. e17_selfcheck_gate_cwru_env_summary.csv
+cwru:
+  envelope:
+    bands_hz: [[12000, 20000]]   # selected on the validation blocks among four octave bands (e18)

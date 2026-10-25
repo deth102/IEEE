@@ -1,0 +1,70 @@
+# Central configuration shared by every experiment.
+# Paths are relative to the repository root (D:\IEEE).
+
+paths:
+  kaist_dir: 02_data/KAIST_Jung2023_vibration
+  cwru_dir: 02_data/CWRU/raw/CWRU
+  cache_dir: 02_data/_cache
+  results_dir: results
+  firmware_models_dir: 03_code/firmware/models
+
+seed: 42
+
+signal:
+  window: 8192          # samples per analysis window (power of two)
+  train_hop_ratio: 0.5  # hop = window * ratio for training windows (augmentation)
+  eval_hop_ratio: 1.0   # non-overlapping windows for validation / test
+
+protocol:
+  n_folds: 5            # blocked (time-contiguous) cross-validation folds per recording
+
+kaist:
+  fs: 25600
+  shaft_band_hz: [30.0, 70.0]   # 1X search band (nominal 3010 rpm = 50.2 Hz)
+  loads: [0Nm, 2Nm, 4Nm]
+  classes: [Normal, BPFI, BPFO, Misalign, Unbalance]
+
+cwru:
+  fs: 48000
+  shaft_band_hz: [20.0, 40.0]   # 1X search band (1730-1797 rpm = 28.8-30.0 Hz)
+  loads: [0hp, 1hp, 2hp, 3hp]
+  classes: [Normal, IR, Ball, OR]
+  envelope:                     # bearing-order features (used when use_envelope: true)
+    orders: [3.5848, 4.7135, 5.4152]   # BPFO, ball defect (2 x BSF), BPFI of the SKF 6205 drive-end bearing
+    speed_hz: [28.83, 29.95]           # shaft speed range 1730-1797 rpm
+    harmonics: 2
+    decim: 16                          # envelope rate 3 kHz, M = N/16 = 512 points
+    bands_hz: [[1500, 3000], [3000, 6000], [6000, 12000], [12000, 20000]]   # candidates (octaves)
+
+use_envelope: false
+
+features: F19          # default feature set (see fdedge/features.py FEATURE_SETS)
+
+rf:
+  n_estimators: 10
+  max_depth: 7
+  max_leaf_nodes: 22
+  class_weight: balanced_subsample
+
+softmax:
+  lr: 0.5
+  l2: 1.0e-4
+  epochs: 2000
+  patience: 50
+
+cnn:
+  window: 2048          # samples per CNN input (log-spectrum of 1024 bins), as in the earlier CNN code
+  folds: 3              # blocked folds used for the CNN baselines (GPU time)
+  models: [edgelite, mobilelite, baseline]
+  epochs: 30
+  batch_size: 64
+  lr: 1.0e-3
+  patience: 8
+
+adaptation:
+  calib_windows: [4, 8, 16, 32, 64]   # healthy-baseline windows collected at the new load
+  fewshot_k: [1, 2, 5, 10]            # labelled target windows per class
+
+window_sweep: [1024, 2048, 4096, 8192, 16384, 32768]
+voting: [1, 3, 5, 7, 9, 11, 15]
+snr_db: [null, 30, 20, 10, 5, 0]

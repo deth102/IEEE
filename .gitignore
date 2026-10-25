@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# PlatformIO / firmware build output
+.pio/
+build/
+*.elf
+*.map
+*.bin
+*.a
+*.o
+
+# editors
+.vscode/
+.idea/
