@@ -61,6 +61,11 @@ LIGHT = "#eef3f7"
 ROOT = Path(__file__).resolve().parents[2]
 FIG_DIR = ROOT / "05_manuscript_JESTIE" / "figures"
 TARGET_FIG_DIR = FIG_DIR      # since 2026-10-26 the target draft lives in 05_manuscript_JESTIE itself
+# file names of the submitted figures (numbered as in KESTREL_manuscript.tex / KESTREL_supplementary.tex)
+SUBMIT_NAME = {"fig09_overview_target": "fig1_overview", "fig01_kestrel_target": "fig2_kestrel",
+               "fig02_protocol": "fig3_protocols", "fig03_staircase_target": "fig4_staircase",
+               "fig05_gate_target": "fig5_gate", "fig06_crossload3d_target": "fig6_crossload",
+               "fig07_cost": "fig7_cost", "fig08_hil_spectra": "fig8_dac_adc_spectra", "fig04_ablation": "figS1_ablation"}
 
 
 def rgb(hexcol: str) -> str:
@@ -432,7 +437,7 @@ def export_pdfs(doc, names):
             c = cp.CellsU(cell)
             c.ResultIU = c.ResultIU - d
         cp.Ungroup()        # Visio renders a group twice in PDF exports (text and fills doubled)
-        pdf = (TARGET_FIG_DIR if name.endswith("_target") else FIG_DIR) / f"{name}.pdf"
+        pdf = (TARGET_FIG_DIR if name.endswith("_target") else FIG_DIR) / f"{SUBMIT_NAME.get(name, name)}.pdf"
         pdf.parent.mkdir(parents=True, exist_ok=True)
         try:
             pdf.unlink(missing_ok=True)
