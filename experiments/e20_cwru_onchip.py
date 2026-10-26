@@ -40,6 +40,8 @@ SIG = {r.name: load_signal(r, cfg) for r in st.recs}
 SCALE = global_scale(max(float(np.max(np.abs(SIG[r.name]))) for r in st.recs))
 HW = cfg.path("results_dir") / "hw"
 CPU = 240e6
+UPD = cfg.adaptation["update"]                    # on-chip update: lr, epochs, l2_anchor
+RF_W, GATE_W = cfg.adaptation["rf_support_weight"], cfg.adaptation["gate_support_weight"]
 
 
 def i16(split, idx=None):
@@ -170,14 +172,14 @@ def do_lifecycle(node):
             b_te, b_pool = node.batch(Wte, metas(te)), node.batch(Wpool, metas(pool))
             b_sup = node.batch(Wpool[sup], metas(pool, F_SUPPORT | F_FEATURES, idx=sup))
             b_q0 = node.batch(WQ, metas(Q))                  # verification windows before the update
-            a = node.adapt(lr=0.1, epochs=200, l2=1e-3, weight=50.0, reref=True)
+            a = node.adapt(lr=UPD["lr"], epochs=UPD["epochs"], l2=UPD["l2_anchor"], weight=GATE_W, reref=True)
             Fsup = np.stack([r["feat"] for r in b_sup])
             sma = copy.deepcopy(sm)
             D = len(sm.mu)
             sma.W, sma.b = a["smw"][:C * D].reshape(C, D), a["smw"][C * D:]
-            g2 = gs.rereferenced(sm, Fsup, pool.y[sup], 50)
+            g2 = gs.rereferenced(sm, Fsup, pool.y[sup], GATE_W)
             g2.Pw = a["P"].reshape(D, D)
-            w = np.concatenate([class_weights(tr.y, C), np.full(len(sup), 50.0)])
+            w = np.concatenate([class_weights(tr.y, C), np.full(len(sup), RF_W)])
             rfa = make_model("rf", C, cfg, seed=0).fit(np.vstack([tr.X, Fsup]), np.concatenate([tr.y, pool.y[sup]]),
                                                         sample_weight=w)
             tau2 = tau_of(trailing(va.rec, gate_s(rfa, sma, g2, va.X), W_GATE),
@@ -190,7 +192,7 @@ def do_lifecycle(node):
             auc = roc_auc_score(np.r_[np.zeros(ok_i.sum()), np.ones(ok_s.sum())], np.r_[g_te[ok_i], g_pool[ok_s]])
             FQ = qfeat(WQ)
             Fpool = qfeat(Wpool)
-            sma_py = copy.deepcopy(sm).finetune(Fpool[sup], pool.y[sup], lr=0.1, epochs=200, l2_anchor=1e-3)
+            sma_py = copy.deepcopy(sm).finetune(Fpool[sup], pool.y[sup], **UPD)
             row = {"source": src, "target": tgt, "auroc": auc,
                    "alarm_rate_shifted": float(np.nanmean(np.where(ok_s, g_pool > tau, np.nan))),
                    "false_alarm_rate": float(np.nanmean(np.where(ok_i, g_te > tau, np.nan))),

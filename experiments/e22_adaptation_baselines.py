@@ -3,9 +3,9 @@
 Support: k labelled windows per class from block 1 of the target recordings (k = 1, 5; three draws); query: blocks
 2..5. Every method starts from the same source model and sees the same support windows.
   softmax head (all feasible on the MCU):
-    anchored update (KESTREL R)  full-batch gradient descent, L2-SP anchor lambda = 1e-3 (eta = 0.1, 200 epochs)
+    anchored update (KESTREL R)  full-batch gradient descent with the L2-SP anchor (cfg adaptation.update)
     unanchored update            the same without the anchor (lambda = 0)
-    bias-only update             only b is updated (cf. TinyTL), 200 epochs
+    bias-only update             only b is updated (cf. TinyTL), same step and epochs
     nearest class mean           prototypes of the standardized support windows (cf. prototypical networks)
   CNN baselines (--cnn): last-layer fine-tuning of EdgeLite and MobileLite trained on the source load
     (Adam, 200 full-batch steps on the support set), single-source, 3 folds
@@ -29,6 +29,7 @@ N = cfg.signal["window"]
 K = cfg.protocol["n_folds"]
 EV = int(N * cfg.signal["eval_hop_ratio"])
 loads = loads_of(cfg, ds)
+UPD = cfg.adaptation["update"]                    # lr, epochs, l2_anchor of the on-chip update
 
 
 def target_blocks(st, tgt):
@@ -85,9 +86,9 @@ if not run.args.cnn:
                         for s in range(3):
                             sup, _ = pick_fewshot(pool, k, C, seed=1000 * f + s)
                             Xs, ys = pool.X[sup], pool.y[sup]
-                            ms = {"anchored update (KESTREL R)": copy.deepcopy(sm).finetune(Xs, ys, 0.1, 200, 1e-3),
-                                  "unanchored update": copy.deepcopy(sm).finetune(Xs, ys, 0.1, 200, 0.0),
-                                  "bias-only update": bias_only(sm, Xs, ys),
+                            ms = {"anchored update (KESTREL R)": copy.deepcopy(sm).finetune(Xs, ys, **UPD),
+                                  "unanchored update": copy.deepcopy(sm).finetune(Xs, ys, UPD["lr"], UPD["epochs"], 0.0),
+                                  "bias-only update": bias_only(sm, Xs, ys, UPD["lr"], UPD["epochs"]),
                                   "nearest class mean": NearestMean(sm, Xs, ys)}
                             for name, m in ms.items():
                                 rows.append({**base, "method": name, "k": k, "seed": s, **scores(Q.y, m.predict(Q.X), C)})

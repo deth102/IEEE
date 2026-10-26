@@ -25,7 +25,7 @@ from fdedge.experiment import Run
 from fdedge.metrics import scores
 from fdedge.models import make_model
 
-run = Run("e16_adaptation_checks", __doc__)
+run = Run("e16_adaptation_checks", __doc__, extra_args=[(("--parts",), {"default": "abc"})])
 cfg, ds = run.cfg, run.dataset
 classes = list(cfg[ds]["classes"])
 C = len(classes)
@@ -36,7 +36,7 @@ K = cfg.protocol["n_folds"]
 EV = int(N * cfg.signal["eval_hop_ratio"])
 loads = loads_of(cfg, ds)
 SEEDS = range(3)
-FIXED = dict(lr=0.1, l2_anchor=1e-3, epochs=200, rf_w=50.0)
+FIXED = dict(**cfg.adaptation["update"], rf_w=cfg.adaptation["rf_support_weight"])
 
 
 def part(rec_ok, load, first: bool) -> Split:
@@ -142,6 +142,9 @@ print(cs_s[cs_s.k.isin([0, 1, 5])].to_string(index=False))
 run.table(summarize(cs, ["setting", "model", "support", "k", "support_sev", "test_sev"]), "cross_severity_by_pair", latex=False)
 
 # --------------------------------------------------------------------------- (c) hyper-parameters from source loads only
+if "c" not in run.args.parts:                       # superseded by the validation search of E26
+    run.done()
+    raise SystemExit
 GRID_SM = [dict(lr=lr, l2_anchor=l2, epochs=ep) for lr, l2, ep in
            itertools.product([0.03, 0.1, 0.3, 1.0], [1e-4, 1e-3, 1e-2, 1e-1], [50, 100, 200, 400])]
 GRID_RF = [dict(rf_w=w) for w in [1.0, 5.0, 10.0, 20.0, 50.0, 100.0]]

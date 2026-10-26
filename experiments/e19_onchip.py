@@ -43,6 +43,12 @@ SCALE = global_scale(max(float(np.max(np.abs(SIG[r.name]))) for r in st.recs))
 HW = cfg.path("results_dir") / "hw"
 HW.mkdir(parents=True, exist_ok=True)
 CPU = 240e6
+UPD = cfg.adaptation["update"]                    # on-chip update: lr, epochs, l2_anchor
+RF_W, GATE_W = cfg.adaptation["rf_support_weight"], cfg.adaptation["gate_support_weight"]
+
+
+def board_adapt(node):
+    return node.adapt(lr=UPD["lr"], epochs=UPD["epochs"], l2=UPD["l2_anchor"], weight=GATE_W, reref=True)
 
 
 # --------------------------------------------------------------------------- helpers
@@ -124,7 +130,7 @@ def softmax_from_board(sm, smw):
 
 
 def retrain_rf(tr, Xs, ys, seed=0):
-    w = np.concatenate([class_weights(tr.y, C), np.full(len(ys), 50.0)])
+    w = np.concatenate([class_weights(tr.y, C), np.full(len(ys), RF_W)])
     return make_model("rf", C, cfg, seed=seed).fit(np.vstack([tr.X, Xs]), np.concatenate([tr.y, ys]), sample_weight=w)
 
 
@@ -151,10 +157,10 @@ def do_lifecycle(node):
             b_te = node.batch(Wte, metas(te))
             b_pool = node.batch(Wpool, metas(pool))
             b_sup = node.batch(Wpool[sup], metas(pool, F_SUPPORT | F_FEATURES, idx=sup))
-            a = node.adapt(lr=0.1, epochs=200, l2=1e-3, weight=50.0, reref=True)
+            a = board_adapt(node)
             Fsup = np.stack([r["feat"] for r in b_sup])
             sma = softmax_from_board(sm, a["smw"])
-            g2 = gs.rereferenced(sm, Fsup, pool.y[sup], 50)      # the board's re-referenced gate
+            g2 = gs.rereferenced(sm, Fsup, pool.y[sup], GATE_W)  # the board's re-referenced gate
             g2.Pw = a["P"].reshape(gs.d, gs.d)
             rfa = retrain_rf(tr, Fsup, pool.y[sup])
             tau2 = tau_of(trailing(va.rec, gate_s(rfa, sma, g2, va.X), W_GATE),
@@ -175,9 +181,9 @@ def do_lifecycle(node):
             Fte, Fpool, FQ = qfeat(Wte), qfeat(Wpool), qfeat(WQ)
             py_g_te = trailing(te.rec, gate_s(rf, sm, gs, Fte), W_GATE)
             py_g_pool = trailing(pool.rec, gate_s(rf, sm, gs, Fpool), W_GATE)
-            sma_py = copy.deepcopy(sm).finetune(Fpool[sup], pool.y[sup], lr=0.1, epochs=200, l2_anchor=1e-3)
+            sma_py = copy.deepcopy(sm).finetune(Fpool[sup], pool.y[sup], **UPD)
             rfa_py = retrain_rf(tr, Fpool[sup], pool.y[sup])
-            gs2_py = gs.rereferenced(sm, Fpool[sup], pool.y[sup], 50)
+            gs2_py = gs.rereferenced(sm, Fpool[sup], pool.y[sup], GATE_W)
             tau2_py = tau_of(trailing(va.rec, gate_s(rfa_py, sma_py, gs2_py, va.X), W_GATE),
                              trailing(pool.rec, gate_s(rfa_py, sma_py, gs2_py, pool.X), W_GATE))
             py_g_q = trailing(Q.rec, gate_s(rfa_py, sma_py, gs2_py, FQ), W_GATE)
@@ -241,10 +247,10 @@ def do_trace(node):
     r1, info1 = node.stream(seq1, m1)
     t_stream1 = time.time() - t0
     b_sup = node.batch(i16(pool, sup), metas(pool, F_SUPPORT | F_FEATURES, idx=sup))
-    a = node.adapt(lr=0.1, epochs=200, l2=1e-3, weight=50.0, reref=True)
+    a = board_adapt(node)
     sma = softmax_from_board(sm, a["smw"])
     Fsup = np.stack([r["feat"] for r in b_sup])
-    g2 = gs.rereferenced(sm, Fsup, pool.y[sup], 50)
+    g2 = gs.rereferenced(sm, Fsup, pool.y[sup], GATE_W)
     g2.Pw = a["P"].reshape(gs.d, gs.d)
     rfa = retrain_rf(tr, Fsup, pool.y[sup])
     tau2 = tau_of(trailing(va.rec, gate_s(rfa, sma, g2, va.X), W_GATE),
@@ -312,14 +318,14 @@ def do_analog(node):
 
         node.clear_support()
         p1 = play(1, F_RESET | F_SUPPORT | F_FEATURES)
-        a = node.adapt(lr=0.1, epochs=200, l2=1e-3, weight=50.0, reref=True)
+        a = board_adapt(node)
         sup = [x for x in p1 if x["win"] == 0]
         sma = softmax_from_board(sm, a["smw"])
         Fsup = np.stack([x["feat"] for x in sup])
         ysup = np.array([x["label"] for x in sup])
-        g2 = gs.rereferenced(sm, Fsup, ysup, 50)
+        g2 = gs.rereferenced(sm, Fsup, ysup, GATE_W)
         g2.Pw = a["P"].reshape(gs.d, gs.d)
-        w = np.concatenate([class_weights(ytr, C), np.full(len(ysup), 50.0)])
+        w = np.concatenate([class_weights(ytr, C), np.full(len(ysup), RF_W)])
         rfa = make_model("rf", C, cfg, seed=0).fit(np.vstack([Xtr, Fsup]), np.concatenate([ytr, ysup]), sample_weight=w)
         tau2 = tau_of(trailing(va.rec, gate_s(rfa, sma, g2, va.X), W_A))
         node.upload_forest(rfa)
@@ -337,7 +343,7 @@ def do_analog(node):
         dl = delays(rec1, g1, tau)
         # Python replay of the update on the board's own analog features
         F1 = np.stack([x["feat"] for x in p1])
-        sma_py = copy.deepcopy(sm).finetune(Fsup, ysup, lr=0.1, epochs=200, l2_anchor=1e-3)
+        sma_py = copy.deepcopy(sm).finetune(Fsup, ysup, **UPD)
         F2 = np.stack([x["feat"] for x in q2])
         g2 = board_g(q2)
         row = {"model": tag, "windows_pass1": len(p1), "windows_pass2_scored": len(q2), "support": a["n"],

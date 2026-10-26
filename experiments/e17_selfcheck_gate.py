@@ -31,6 +31,7 @@ from fdedge.models import make_model
 
 run = Run("e17_selfcheck_gate", __doc__)
 cfg, ds = run.cfg, run.dataset
+K_PROTO = cfg.get("gate", {}).get("k", 8)                # prototypes per class (configs/gate_k4.yaml: 4)
 classes = list(cfg[ds]["classes"])
 C = len(classes)
 NORMAL = classes.index("Normal")
@@ -139,7 +140,7 @@ for multi in (False, True):
             for tgt in [L for L in loads if L not in src]:
                 base = {"scenario": "load", "setting": "LOLO" if multi else "single-source", "source": "+".join(src),
                         "target": tgt, "fold": f}
-                ref, pg = Ref(sm, tr.X), ProtoGate(sm, tr.X, tr.y, C, seed=f)
+                ref, pg = Ref(sm, tr.X), ProtoGate(sm, tr.X, tr.y, C, k=K_PROTO, seed=f)
                 evaluate(rf, sm, ref, pg, va, te, target_split(st, [tgt]), base, rows)
                 # verify: after q = 5 adaptation the gate should fall back to its in-distribution level
                 pool, Q = part(lambda r: True, tgt, True), part(lambda r: True, tgt, False)
@@ -149,8 +150,8 @@ for multi in (False, True):
                 before, _ = sliding(Q, window_scores(rf, sm, Q.X, ref, pg)[GATE], W_V)
                 for s in range(3):
                     sup, _ = pick_fewshot(pool, 5, C, seed=1000 * f + s)
-                    sma = copy.deepcopy(sm).finetune(pool.X[sup], pool.y[sup], lr=0.1, epochs=200, l2_anchor=1e-3)
-                    w = np.concatenate([class_weights(tr.y, C), np.full(len(sup), 50.0)])
+                    sma = copy.deepcopy(sm).finetune(pool.X[sup], pool.y[sup], **cfg.adaptation["update"])
+                    w = np.concatenate([class_weights(tr.y, C), np.full(len(sup), cfg.adaptation["rf_support_weight"])])
                     rfa = make_model("rf", C, cfg, seed=s).fit(np.vstack([tr.X, pool.X[sup]]),
                                                                np.concatenate([tr.y, pool.y[sup]]), sample_weight=w)
                     # the node re-references its statistics with the labelled support windows (weight 50, as the RF)
@@ -181,7 +182,7 @@ for h in range(n_sev):
         tr, va, te, sh = mk(tr_p), mk(va_p), mk(te_p), mk(sh_p)
         rf = make_model("rf", C, cfg, seed=f).fit(tr.X, tr.y, va.X, va.y)
         sm = make_model("softmax", C, cfg, seed=f).fit(tr.X, tr.y, va.X, va.y)
-        evaluate(rf, sm, Ref(sm, tr.X), ProtoGate(sm, tr.X, tr.y, C, seed=f), va, te, sh,
+        evaluate(rf, sm, Ref(sm, tr.X), ProtoGate(sm, tr.X, tr.y, C, k=K_PROTO, seed=f), va, te, sh,
                  {"scenario": "severity", "setting": f"held-out severity {h}", "fold": f}, rows)
 
 # --------------------------------------------------------------------------- analog path (KAIST, deployed models)
@@ -204,7 +205,7 @@ if ds == "kaist":
             an = Split(F[:, 3:].astype(np.float32), F[:, 2].astype(int), F[:, 0].astype(int), F[:, 1].astype(int))
         rf, sm = models[tag]
         trx, trY = (tr.X, tr.y) if tag == "clean" else _augment(cfg, st, tr)
-        evaluate(rf, sm, Ref(sm, trx), ProtoGate(sm, trx, trY, C), va, te, an,
+        evaluate(rf, sm, Ref(sm, trx), ProtoGate(sm, trx, trY, C, k=K_PROTO), va, te, an,
                  {"scenario": "analog", "setting": f"DAC-ADC, {tag} model", "fold": 0}, rows, w_list=(1, 2, 4))
 
 df = pd.DataFrame(rows)

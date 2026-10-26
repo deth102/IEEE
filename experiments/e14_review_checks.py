@@ -104,9 +104,9 @@ def target_blocks(tgt):
 def adapt(model, kind, tr, S_X, S_y, seed):
     if kind == "softmax":
         m = copy.deepcopy(model)
-        return m.finetune(S_X, S_y, lr=0.1, epochs=200, l2_anchor=1e-3)
+        return m.finetune(S_X, S_y, **cfg.adaptation["update"])
     m = make_model(kind, C, cfg, seed=seed)
-    w = np.concatenate([class_weights(tr.y, C), np.full(len(S_y), 50.0)])
+    w = np.concatenate([class_weights(tr.y, C), np.full(len(S_y), cfg.adaptation["rf_support_weight"])])
     return m.fit(np.vstack([tr.X, S_X]), np.concatenate([tr.y, S_y]), sample_weight=w)
 
 

@@ -834,7 +834,8 @@ def fig_ablation(page, cfg, T):
     yb = 1.03
     cv.polyline([(ax.X(3), ax.Y(0.99)), (ax.X(3), ax.Y(yb)), (ax.X(6), ax.Y(yb)), (ax.X(6), ax.Y(1.005))],
                 color=INK, lw=0.7)
-    cv.text(ax.X(4.5), ax.Y(yb) + 1 * PT, "+11.6 pp (RF)", va="bottom", color=INK, bold=True)
+    rf = s[s.model == "RF"].set_index("features").f1_mean
+    cv.text(ax.X(4.5), ax.Y(yb) + 1 * PT, f"+{100 * (rf['F19'] - rf['F16']):.1f} pp (RF)", va="bottom", color=INK, bold=True)
     ax.spines()
     ax.frame()
     ax.yticks([0.5, 0.6, 0.7, 0.8, 0.9, 1.0], ["50", "60", "70", "80", "90", "100"])
@@ -1671,21 +1672,37 @@ def fig_tradeoff(page, cfg, T):
     cv.finish()
 
 
-# --------------------------------------------------------------------------- target draft (target/main_target.tex)
-# Values still to be obtained; every one is listed in target/target_key.md.
+# --------------------------------------------------------------------------- manuscript (05_manuscript_JESTIE/main_target.tex)
+# Every value comes from the result tables (hyper-parameters of E26); no target values remain.
+def _tab(cfg, name):
+    return pd.read_csv(cfg.path("results_dir") / "tables" / f"{name}.csv")
+
+
+def _gate_auroc(cfg):
+    g = _tab(cfg, "e17_selfcheck_gate_summary")
+    g = g[(g.scenario == "load") & (g.setting == "single-source") & (g.score == "KESTREL") & (g.W == 10)]
+    return f"{100 * float(g.auroc.iloc[0]):.1f}%"
+
+
+def _retune_kaist(cfg):
+    """Macro-F1 (%) before and after retuning, RF and softmax (single-source KAIST, q = 5)."""
+    mt = _tab(cfg, "e16_adaptation_checks_matched")
+    none = mt[(mt.setting == "single-source") & (mt.method == "none")].set_index("model").f1_mean
+    fs = _tab(cfg, "e14_review_checks_fewshot_time")
+    k5 = fs[(fs.setting == "single-source") & (fs.support == "time-separated") & (fs.k == 5)].set_index("model").f1_mean
+    return tuple((round(100 * none[m], 1), round(100 * k5[m], 1)) for m in ("RF", "Softmax"))
+
+
 def fig_staircase_target(page, cfg, T):
-    fig_staircase(page, cfg, T, name="fig03_staircase_target", auroc="99.2%",
-                  targets={(3, "sm"): 0.962, (4, "rf"): 0.935, (4, "sm"): 0.928,
-                           (5, "rf"): 0.991, (5, "sm"): 0.983,      # measured: every fold-0 test window on the board (E19)
-                           (6, "rf"): 0.743, (6, "sm"): 0.763})     # measured: DAC-ADC campaign, one window per recording
+    fig_staircase(page, cfg, T, name="fig03_staircase_target", auroc=_gate_auroc(cfg))
 
 
 def fig_crossload_target(page, cfg, T):
-    fig_crossload(page, cfg, T, name="fig06_crossload3d_target", targets={("after", "2Nm", "4Nm"): 0.907})
+    fig_crossload(page, cfg, T, name="fig06_crossload3d_target")
 
 
 def fig_heatmap_target(page, cfg, T):
-    fig_heatmap(page, cfg, T, name="fig06_heatmap_target", targets={("after", "2Nm", "4Nm"): 0.907})
+    fig_heatmap(page, cfg, T, name="fig06_heatmap_target")
 
 
 def fig_gate_target(page, cfg, T):
@@ -1694,7 +1711,7 @@ def fig_gate_target(page, cfg, T):
 
 
 def fig_overview_target(page, cfg, T):
-    fig_overview(page, cfg, T, name="fig09_overview_target", retune=((62.8, 96.4), (51.1, 96.2)), sfx="_target",
+    fig_overview(page, cfg, T, name="fig09_overview_target", retune=_retune_kaist(cfg), sfx="_target",
                  gate_box="Self-check gate (S): class prototypes + head disagreement")
 
 

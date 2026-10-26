@@ -39,13 +39,15 @@ fs = t("e14_review_checks_fewshot_time")
 k5 = fs[(fs.setting == "single-source") & (fs.support == "time-separated") & (fs.k == 5)].set_index("model").f1_mean
 cs = t("e16_adaptation_checks_cross_severity")
 cs = cs[(cs.setting == "single-source") & (cs.support == "other severity (block 1 of A)") & (cs.k == 5)].set_index("model").f1_mean
+eq = t("e19_onchip_equiv_summary").iloc[0]                   # every fold-0 test window on the board
+an = t("e19_onchip_analog").set_index("model").loc["aug"]     # DAC-ADC loop, noise-augmented model
 rows = [("Random split\n(overlapping)", rnd["RF"], rnd["Softmax"]),
         ("Time-blocked\n(seen load)", blk["RF"], blk["Softmax"]),
         ("Unseen load", none["RF"], none["Softmax"]),
         ("Unseen load\n+ R, *q* = 5", k5["RF"], k5["Softmax"]),
         ("Support from other\nseverity (R)", cs["RF"], cs["Softmax"]),
-        ("ESP32 replay\nat 25.6 kHz", 0.962, 0.962),          # results/hw (tools.parse_hil): 131/135 correct
-        ("ESP32 DAC–ADC\n+ on-chip R", 0.721, 0.832)]        # noise-augmented model, 82 test windows
+        ("ESP32 replay", eq.f1_rf_test, eq.f1_sm_test),
+        ("ESP32 DAC–ADC\n+ on-chip R", an.f1_rf_after, an.f1_sm_after)]
 pd.DataFrame(rows, columns=["step", "rf", "sm"]).to_csv(TAB / "fig_staircase.csv", index=False)
 
 # --------------------------------------------------------------------------- gate trace and ROC
@@ -91,8 +93,8 @@ for ri, r in enumerate(st.recs):
         ps.append((X, np.full(len(S), r.cls), np.full(len(S), ri), S))
 pool = Split(*(np.concatenate([p[i] for p in ps]) for i in range(4)))
 sup, _ = pick_fewshot(pool, 5, C, seed=0)
-sma = copy.deepcopy(sm).finetune(pool.X[sup], pool.y[sup], lr=0.1, epochs=200, l2_anchor=1e-3)
-w = np.concatenate([class_weights(tr.y, C), np.full(len(sup), 50.0)])
+sma = copy.deepcopy(sm).finetune(pool.X[sup], pool.y[sup], **cfg.adaptation["update"])
+w = np.concatenate([class_weights(tr.y, C), np.full(len(sup), cfg.adaptation["rf_support_weight"])])
 rfa = make_model("rf", C, cfg, seed=0).fit(np.vstack([tr.X, pool.X[sup]]), np.concatenate([tr.y, pool.y[sup]]), sample_weight=w)
 P1 = ref_P(sm, np.vstack([tr.X] + [pool.X[sup]] * 50))
 tau1 = float(np.quantile(np.r_[per_rec(va, gate(rfa, sma, P1, va.X, sm)), trail(gate(rfa, sma, P1, pool.X, sm))], 0.99))

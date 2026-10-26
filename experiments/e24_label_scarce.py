@@ -47,7 +47,7 @@ def part(load, first):
 
 
 def upd(sm, X, y):
-    return copy.deepcopy(sm).finetune(X, y, lr=0.1, epochs=200, l2_anchor=1e-3)
+    return copy.deepcopy(sm).finetune(X, y, **cfg.adaptation["update"])
 
 
 rows = []

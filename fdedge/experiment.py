@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import load_config, results_dir
+from .config import Config, _merge, load_config, results_dir
 from .plotting import setup
 
 
@@ -24,6 +24,9 @@ class Run:
             ap.add_argument(*args, **kw)
         self.args = ap.parse_args()
         self.cfg = load_config(self.args.config)
+        ov = self.cfg.get("dataset_overrides", {}).get(self.args.dataset)
+        if ov:                                           # per-dataset hyper-parameters (E26)
+            self.cfg = Config(_merge(dict(self.cfg), ov))
         self.name = name
         self.quick = self.args.quick
         self.dataset = self.args.dataset

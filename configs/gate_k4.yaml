@@ -1,0 +1,6 @@
+# Self-check gate with four instead of eight prototypes per class (Supplementary Note S4).
+# Usage: python -m experiments.e17_selfcheck_gate --config configs/gate_k4.yaml
+extends: default.yaml
+gate:
+  k: 4
+tag_suffix: k4            # result files e17_selfcheck_gate_k4_*.csv
