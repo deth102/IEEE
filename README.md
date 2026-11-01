@@ -11,6 +11,10 @@ KESTREL is a fault-diagnosis node that closes the monitor–alert–adapt–veri
 - an anchored on-chip update of the softmax head;
 - the complete lifecycle on an ESP32.
 
+## Supplementary Material
+
+[`docs/KESTREL_supplementary.pdf`](docs/KESTREL_supplementary.pdf) holds Supplementary Notes S1–S10 cited in the paper. Bracketed numbers in it refer to the reference list of the paper.
+
 ## Data
 
 | Dataset | Use | Source |
